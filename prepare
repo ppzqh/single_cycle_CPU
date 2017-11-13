@@ -1,7 +1,7 @@
 根据以上数据通路，单周期CPU可划分为以下几个模块：
 //1.PCWre判断是否停机 2.curPC为当前指令地址，PC4 = PC + 4 3.上升沿触发
-module PCUnit(input clk, Reset, PCWre, input [31:0] nextPC, output [31:0] curPC, PC4);
-  always@(posedge clk or negedge)begin
+module PCUnit(input clk, Reset, PCWre, input [31:0] nextPC, output reg [31:0] curPC, PC4);
+  always@ (posedge clk or negedge Reset) begin
     if (Reset == 1'b0) curPC = 32'h00000000;
     else if (PCWre) curPC = nextPC;
     PC4 = curPC + 4;
@@ -23,27 +23,28 @@ endmodule
 module ControlUnit(input sign, zero, input [5:0] op, output reg Reset, PCWre, ExtSel, InsMemRW, RegDst, RegWre, ALUSrcA, ALUSrcB, RD, WR, DBDataSrc, output reg [1:0] PCSrc, output reg [2:0] ALUOp);
   always@(sign or zero or op)begin
     if (op == 6'b111000) PCSrc = 2'b10;
-    else if (op == 6'b110000 && zero == 1) PCSrc = 2'b01;
-    else if (op == 6'b000001 && zero == 0) PCSrc = 2'b01;
-    else if (op == 6'b000010 && sign == 0 && zero == 0) PCSrc = 2'b01;
-    else PCSrc = 2'b00;
-    case(op)
-      6'b000000:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100011111x000; //add
-      6'b000001:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b11010111101000; //addi
-      6'b000010:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100011111x001; //sub
-      6'b010000:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b11010111100011; //ori
-      6'b010001:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100011111x100; //and
-      6'b010010:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100011111x011; //or
-      6'b011000:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b11100111110010; //sll
-      6'b011100:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100011111x110; //slt
-      6'b100110:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1101x0110x1000; //sw 
-      6'b100111:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b11011110101000; //lw
-      6'b110000:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100x0111x1001; //beq
-      6'b110001:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100x0111x1001; //bne
-      6'b110010:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b1100x0111x1001; //bgtz
-      6'b111000:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b11xxx0111xxxxx; //j
-      6'b111111:{{Reset}, {PCWre}, {ALUSrcA}, {ALUSrcB}, {DBDataSrc}, {RegWre}, {InsMemRW}, {RD}, {WR}, {RegDst}, {ExtSel}, {ALUOp}} = 14'b10xxx0111xxxxx; //halt
-    endcase
+    else if (op == 6'b110000 && zero == 1) PCSrc <= 2'b01;
+    else if (op == 6'b110001 && zero == 0) PCSrc <= 2'b01;
+    else if (op == 6'b110010 && sign == 0 && zero == 0) PCSrc <= 2'b01;
+    else PCSrc <= 2'b00;
+    Reset <= 1;
+    PCWre <= (op != 6'b111111);
+    ALUSrcA <= (op == 6'b011000); //sll
+    ALUSrcB <= (op == 6'b000001 || op == 6'b010000 || op == 6'b100110 || op == 6'b100111); //ori addi sw lw
+    DBDataSrc <= (op == 6'b100111); //lw
+    RegWre <= !(op == 6'b100110 || op == 6'b110000 || op == 6'b110001 || op == 6'b110010 || op == 6'b111000 || op == 6'b111111); //R-type lw
+    InsMemRW <= 1;
+    RD <= (op != 6'b100111); //lw时为0
+    WR <= (op != 6'b100110); //sw时为0
+    RegDst <= !(op == 6'b000001 || op == 6'b010000 || op == 6'b100111); //除ori addi lw
+    ExtSel <= !(op == 6'b011000 || op == 6'b010000);
+    if (op[5:1] == 5'b00000 || op[5:1] == 5'b10011) ALUOp <= 3'b000; //add addi sw lw
+    else if (op[5:2] == 4'b1100 || op == 6'b000010) ALUOp <= 3'b001; //b sub
+    else if (op == 6'b010000 || op == 6'b010010) ALUOp <= 3'b011; //ori or
+    else if (op == 6'b010001) ALUOp <= 3'b100; //and
+    else if (op == 6'b011000) ALUOp <= 3'b010; //sll
+    else if (op == 6'b011100) ALUOp <= 3'b110; //slt
+    else ALUOp <= 3'b111;
   end
 endmodule
 
