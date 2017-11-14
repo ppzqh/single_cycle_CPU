@@ -12,7 +12,7 @@ endmodule
 module InstructMem (input InsMemRW, input [31:0] InsAddr, output reg [31:0] Instruction);
   reg [7:0] ROM [0:99];
   initial begin
-    $readmemb("in.txt", ROM[0]);
+    $readmemb("F:/rom_data.txt", ROM);
   end
   always@(InsMemRW or InsAddr)begin
     if (InsMemRW == 1) Instruction = {{ROM[InsAddr]},{ROM[InsAddr + 1]},{ROM[InsAddr + 2]},{ROM[InsAddr + 3]}};
